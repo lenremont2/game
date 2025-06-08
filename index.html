@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Хомячок-ремонтник (Image Version)</title>
+    <title>Хомячок-ремонтник (Local Files)</title>
     <style>
         body, html {
             margin: 0;
@@ -12,7 +12,7 @@
             width: 100%;
             height: 100%;
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-            background-color: #333; /* Темный фон на время загрузки */
+            background-color: #333;
             display: flex;
             justify-content: center;
             align-items: center;
@@ -20,12 +20,11 @@
         }
         #loadingScreen { font-size: 24px; }
         #gameCanvas {
-            display: none; /* Скрыт до полной загрузки */
+            display: none;
             position: absolute;
             top: 0;
             left: 0;
         }
-
         #gameOverScreen {
             position: absolute;
             top: 50%;
@@ -40,7 +39,6 @@
             box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
             min-width: 280px;
         }
-
         #gameOverScreen h2 { margin: 0 0 10px 0; font-size: 24px; }
         #finalDiscount { font-size: 48px; font-weight: bold; color: #ffeb3b; margin: 15px 0; }
         #highScore { font-size: 16px; margin-bottom: 25px; color: #e0e0e0; }
@@ -54,10 +52,8 @@
     </style>
 </head>
 <body>
-
     <div id="loadingScreen">Загрузка изображений...</div>
     <canvas id="gameCanvas"></canvas>
-    
     <div id="gameOverScreen">
         <h2>Игра окончена!</h2>
         <p>Ваша итоговая скидка:</p>
@@ -65,7 +61,6 @@
         <p id="highScore">Лучший результат: 0.0%</p>
         <button id="restartBtn">Начать заново</button>
     </div>
-
     <script>
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
@@ -75,15 +70,15 @@
         const highScoreEl = document.getElementById('highScore');
         const loadingScreen = document.getElementById('loadingScreen');
 
-        // --- 1. ИСТОЧНИКИ ИЗОБРАЖЕНИЙ ---
-        const imageUrls = {
-            player: '/ChatGPT-Image-8-июн.-2025-г.-19_58_05.jpg',
+        // --- 1. ПУТИ К ЛОКАЛЬНЫМ ИЗОБРАЖЕНИЯМ ---
+        const imagePaths = {
+            player: 'van.jpg', // Упрощенное имя файла
             techniques: [
-                '/nout.png',
-                '/pul.jpg',
-                '/stir.jpg',
-                '/hol.jpg',
-                '/benzo.jpg'
+                'nout.png',
+                'pul.jpg',
+                'stir.jpg',
+                'hol.jpg',
+                'benzo.jpg'
             ]
         };
 
@@ -96,7 +91,7 @@
             physics: { gravity: 0.6, jumpStrength: -12.5 },
             world: { initialSpeed: 8, speedIncrement: 0.8, groundHeight: 180, groundColor: '#1976D2' },
             technique: {
-                width: 50, // Стандартный размер для всей техники
+                width: 50,
                 height: 50,
                 spawnInterval: 120,
                 initialAmplitude: 50,
@@ -107,21 +102,19 @@
             particles: { count: 10, speed: 3, lifespan: 40, color: '#ffeb3b' }
         };
 
-        // Глобальный объект для хранения загруженных изображений
         let loadedImages = { player: null, techniques: [] };
-
-        let gameState;
-        let player, groundY, gameSpeed, collectedCount;
+        let gameState, player, groundY, gameSpeed, collectedCount;
         let obstacles, particles;
         let frameCount, nextTechniqueSpawn, nextHatchSpawn, techniqueAmplitude;
         
-        // --- 2. ПРЕ-ЗАГРУЗЧИК АССЕТОВ ---
+        // --- 2. ЗАГРУЗЧИК ЛОКАЛЬНЫХ АССЕТОВ ---
         function loadAssets(callback) {
-            let totalAssets = 1 + imageUrls.techniques.length;
+            let totalAssets = 1 + imagePaths.techniques.length;
             let loadedCount = 0;
 
             function onAssetLoad() {
                 loadedCount++;
+                loadingScreen.textContent = `Загрузка... ${Math.round(loadedCount / totalAssets * 100)}%`;
                 if (loadedCount === totalAssets) {
                     loadingScreen.style.display = 'none';
                     canvas.style.display = 'block';
@@ -131,16 +124,16 @@
 
             // Загрузка изображения игрока
             loadedImages.player = new Image();
-            loadedImages.player.crossOrigin = "Anonymous";
-            loadedImages.player.src = imageUrls.player;
+            loadedImages.player.src = imagePaths.player;
             loadedImages.player.onload = onAssetLoad;
+            loadedImages.player.onerror = () => alert(`Не удалось загрузить изображение игрока: ${imagePaths.player}. Убедитесь, что файл находится в той же папке и имя верное.`);
 
             // Загрузка изображений техники
-            imageUrls.techniques.forEach(url => {
+            imagePaths.techniques.forEach(path => {
                 const img = new Image();
-                img.crossOrigin = "Anonymous";
-                img.src = url;
+                img.src = path;
                 img.onload = onAssetLoad;
+                img.onerror = () => alert(`Не удалось загрузить изображение техники: ${path}. Убедитесь, что файл находится в той же папке.`);
                 loadedImages.techniques.push(img);
             });
         }
@@ -199,19 +192,12 @@
             if (frameCount >= nextTechniqueSpawn) {
                 const playerTopY = groundY - config.player.height;
                 const centerY = playerTopY - techniqueAmplitude - config.technique.minGapAbovePlayer;
-                
-                // --- 3. РАНДОМНЫЙ ВЫБОР ТЕХНИКИ ---
                 const randomIndex = Math.floor(Math.random() * loadedImages.techniques.length);
                 const randomImage = loadedImages.techniques[randomIndex];
-
                 obstacles.push({
-                    type: 'technique',
-                    x: canvas.width,
-                    initialY: centerY,
-                    width: config.technique.width,
-                    height: config.technique.height,
-                    amplitude: techniqueAmplitude,
-                    image: randomImage // Сохраняем конкретное изображение для объекта
+                    type: 'technique', x: canvas.width, initialY: centerY,
+                    width: config.technique.width, height: config.technique.height,
+                    amplitude: techniqueAmplitude, image: randomImage
                 });
                 nextTechniqueSpawn = frameCount + Math.max(30, config.technique.spawnInterval - gameSpeed * 5);
             }
@@ -233,8 +219,7 @@
                     if (player.x < obj.x + obj.width && player.x + player.width > obj.x &&
                         player.y < obj.y + obj.height && player.y + player.height > obj.y) {
                         collectTechnique(obj);
-                        obstacles.splice(i, 1);
-                        continue;
+                        obstacles.splice(i, 1); continue;
                     }
                 }
                 if (obj.type === 'hatch' && player.x + player.width / 2 > obj.x && player.x + player.width / 2 < obj.x + obj.width) {
@@ -272,10 +257,7 @@
             drawUI();
         }
         
-        // --- 4. ОТРИСОВКА ИЗОБРАЖЕНИЙ ---
-        function drawPlayer() {
-            ctx.drawImage(loadedImages.player, player.x, player.y, player.width, player.height);
-        }
+        function drawPlayer() { ctx.drawImage(loadedImages.player, player.x, player.y, player.width, player.height); }
         function drawObstacles() {
             obstacles.forEach(obj => {
                 if (obj.type === 'technique') {
@@ -305,33 +287,27 @@
             gameState = 'gameOver';
             const finalDiscount = calculateDiscount(collectedCount);
             finalDiscountEl.textContent = `${finalDiscount.toFixed(1)}%`;
-            let highScore = parseFloat(localStorage.getItem('hamsterWithImagesHighScore')) || 0;
+            let highScore = parseFloat(localStorage.getItem('hamsterLocalImagesHighScore')) || 0;
             if (finalDiscount > highScore) {
                 highScore = finalDiscount;
-                localStorage.setItem('hamsterWithImagesHighScore', highScore.toString());
+                localStorage.setItem('hamsterLocalImagesHighScore', highScore.toString());
             }
             highScoreEl.textContent = `Лучший результат: ${highScore.toFixed(1)}%`;
             gameOverScreen.style.display = 'block';
         }
 
         function handleResize() { 
-            // Не перезапускаем игру при ресайзе, если она уже идет, чтобы не сбрасывать прогресс.
-            // Вместо этого просто адаптируем размеры
             canvas.width = window.innerWidth;
             canvas.height = window.innerHeight;
             groundY = canvas.height - config.world.groundHeight;
-            if (gameState !== 'running') {
-                init();
-            }
         }
 
-        // --- 5. ЗАПУСК ИГРЫ ПОСЛЕ ЗАГРУЗКИ ---
         window.addEventListener('resize', handleResize);
         document.addEventListener('mousedown', handleJump);
         document.addEventListener('touchstart', (e) => { e.preventDefault(); handleJump(); });
         restartBtn.addEventListener('click', init);
-
-        // Начинаем с загрузки ассетов, а init() будет вызван как callback
+        
+        // --- ЗАПУСК ИГРЫ ПОСЛЕ ЗАГРУЗКИ ---
         loadAssets(init);
     </script>
 </body>
